@@ -16,8 +16,12 @@ supabase = init_connection()
 
 # Función para traer los videos de la base de datos
 def cargar_videos():
-    response = supabase.table("videos").select("*").order("id").execute()
-    return response.data
+    try:
+        response = supabase.table("videos").select("*").order("id").execute()
+        return response.data
+    except Exception as e:
+        st.error(f"Error al conectar con la base de datos: {e}")
+        return []
 
 # Estilos visuales
 st.markdown("""
@@ -42,9 +46,9 @@ formatos = ["YouTube Shorts", "Reel / TikTok", "Video Largo (16:9)", "Carrusel"]
 
 # Métricas rápidas
 col_m1, col_m2, col_m3 = st.columns(3)
-col_m1.metric("En Producción", len([v for v in videos_db if v["estado"] not in ["✅ Publicado", "Ideación"]]))
-col_m2.metric("Requieren Ajustes", len([v for v in videos_db if v["estado"] == "⚠️ Ajustes"]))
-col_m3.metric("Publicados", len([v for v in videos_db if v["estado"] == "✅ Publicado"]))
+col_m1.metric("En Producción", len([v for v in videos_db if v.get("estado") not in ["✅ Publicado", "Ideación"]]))
+col_m2.metric("Requieren Ajustes", len([v for v in videos_db if v.get("estado") == "⚠️ Ajustes"]))
+col_m3.metric("Publicados", len([v for v in videos_db if v.get("estado") == "✅ Publicado"]))
 st.divider()
 
 # Sidebar para agregar nuevo contenido
@@ -56,17 +60,17 @@ with st.sidebar:
         submit_btn = st.form_submit_button("Añadir al flujo", type="primary")
         
         if submit_btn and nuevo_titulo:
-            # Insertar directamente en Supabase
-            supabase.table("videos").insert({
-                "titulo": nuevo_titulo,
-                "formato": nuevo_formato,
-                "estado": "Ideación",
-                "guion": "",
-                "hashtags": ""
-            }).execute()
-            st.toast(f'¡"{nuevo_titulo}" guardado en la base de datos!', icon="✅")
-            time.sleep(0.5)
-            st.rerun()
+            try:
+                supabase.table("videos").insert({
+                    "titulo": nuevo_titulo,
+                    "formato": nuevo_formato,
+                    "estado": "Ideación"
+                }).execute()
+                st.toast(f'¡"{nuevo_titulo}" guardado en la base de datos!', icon="✅")
+                time.sleep(0.5)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al guardar: {e}")
 
 # Layout Kanban en columnas
 columnas = st.columns(len(estados))
@@ -75,40 +79,55 @@ for idx, estado in enumerate(estados):
     with columnas[idx]:
         st.markdown(f"**{estado}**")
         
-        videos_columna = [v for v in videos_db if v["estado"] == estado]
+        videos_columna = [v for v in videos_db if v.get("estado") == estado]
         
         for video in videos_columna:
-            with st.expander(f"📼 {video['titulo']}", expanded=False):
-                st.caption(f"📱 {video['formato']}")
+            video_id = video.get("id")
+            video_titulo = video.get("titulo", "Sin título")
+            video_formato = video.get("formato", "General")
+            video_guion = video.get("guion") or ""
+            video_hashtags = video.get("hashtags") or ""
+            
+            with st.expander(f"📼 {video_titulo}", expanded=False):
+                st.caption(f"📱 {video_formato}")
                 
                 # Campos editables en tiempo real
-                nuevo_guion = st.text_input("Link al Guion / Docs", value=video["guion"] or "", key=f"guion_{video['id']}")
+                nuevo_guion = st.text_input("Link al Guion / Docs", value=video_guion, key=f"guion_{video_id}")
                 
                 # Botón de simulación IA
-                if st.button("✨ Generar Hashtags con IA", key=f"ai_{video['id']}", use_container_width=True):
+                if st.button("✨ Generar Hashtags con IA", key=f"ai_{video_id}", use_container_width=True):
                     with st.spinner('Analizando guion...'):
                         time.sleep(1)
                         hashtags_nuevos = "#Tendencia #CreatorCRM #Viral"
-                        supabase.table("videos").update({"hashtags": hashtags_nuevos}).eq("id", video["id"]).execute()
+                        supabase.table("videos").update({"hashtags": hashtags_nuevos}).eq("id", video_id).execute()
                         st.success("¡Hashtags guardados!")
                         st.rerun()
                 
-                if video["hashtags"]:
-                    st.info(video["hashtags"])
+                if video_hashtags:
+                    st.info(video_hashtags)
                 
                 # Selector de cambio de estado
                 nuevo_estado = st.selectbox(
                     "Cambiar estado:", 
                     estados, 
-                    index=estados.index(estado), 
-                    key=f"estado_{video['id']}"
+                    index=estados.index(estado) if estado in estados else 0, 
+                    key=f"estado_{video_id}"
                 )
                 
+                # Botón para eliminar el trabajo
+                if st.button("🗑️ Eliminar trabajo", key=f"del_{video_id}", use_container_width=True):
+                    try:
+                        supabase.table("videos").delete().eq("id", video_id).execute()
+                        st.toast("Trabajo eliminado", icon="⚠️")
+                        time.sleep(0.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al eliminar: {e}")
+                
                 # Si cambian el estado o el guion, actualizamos Supabase automáticamente
-                if nuevo_estado != estado or nuevo_guion != (video["guion"] or ""):
+                if nuevo_estado != estado or nuevo_guion != video_guion:
                     supabase.table("videos").update({
                         "estado": nuevo_estado,
                         "guion": nuevo_guion
-                    }).eq("id", video["id"]).execute()
+                    }).eq("id", video_id).execute()
                     st.rerun()
-                    
