@@ -48,22 +48,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🎬 Studio CRM & Academy - Catalina & Equipo")
-st.markdown("Gestión integral de contenidos y desarrollo de cursos internos en tiempo real.")
+st.markdown("Panel ejecutivo de contenidos, embudos de conversión y desarrollo de productos digitales.")
 
 # Pestañas principales de navegación
-tab_kanban, tab_cursos = st.tabs(["🚀 Flujo de Contenido (Kanban)", "📚 Cursos & Capacitaciones"])
+tab_kanban, tab_cursos = st.tabs(["🚀 Flujo de Contenido & Embudos", "📚 Academia & Cursos Internos"])
 
 videos_db = cargar_videos()
 cursos_db = cargar_cursos()
 
 estados = ["Ideación", "Borradores", "Guionización", "Cola de Render", "Revisión (QA)", "⚠️ Ajustes", "Programadas", "✅ Publicado"]
 formatos = ["YouTube Shorts", "Reel / TikTok", "Video Largo (16:9)", "Carrusel"]
+etapas_embudo = ["🎯 Atracción (Top)", "🧠 Nutrición (Middle)", "💰 Conversión/Venta (Bottom)"]
+estados_curso = ["Borrador", "En Edición", "✅ Publicado y Disponible"]
 
 # ==========================================
-# PESTAÑA 1: KANBAN DE CONTENIDO
+# PESTAÑA 1: KANBAN DE CONTENIDO & EMBUDOS
 # ==========================================
 with tab_kanban:
-    # Métricas rápidas
+    # Métricas estratégicas rápidas
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     col_m1.metric("En Producción", len([v for v in videos_db if v.get("estado") not in ["✅ Publicado", "Ideación"]]))
     col_m2.metric("Programadas", len([v for v in videos_db if v.get("estado") == "Programadas"]))
@@ -71,13 +73,15 @@ with tab_kanban:
     col_m4.metric("Publicados", len([v for v in videos_db if v.get("estado") == "✅ Publicado"]))
     st.divider()
 
-    # Sidebar para añadir nuevo contenido adaptado al prompt
+    # Sidebar para añadir nuevo contenido alineado al embudo
     with st.sidebar:
         st.header("⚡ Nueva Idea / Publicación")
         with st.form("nuevo_video_form", clear_on_submit=True):
-            nuevo_titulo = st.text_input("Título / Idea Principal")
+            nuevo_titulo = st.text_input("Título / Tema del Video")
             nuevo_formato = st.selectbox("Tipo de Publicación", formatos)
-            nuevo_subtitulo = st.text_area("Subtítulos / Ganchos")
+            objetivo_embudo = st.selectbox("Objetivo en el Embudo", etapas_embudo)
+            nuevo_subtitulo = st.text_area("Subtítulos / Ganchos (Hook)")
+            cta_texto = st.text_input("Llamado a la Acción (CTA) / Link")
             nueva_fecha = st.date_input("Fecha Programada", value=date.today())
             responsable_asignado = st.selectbox("Asignar Responsable", EQUIPO)
             
@@ -89,7 +93,7 @@ with tab_kanban:
                         "titulo": nuevo_titulo,
                         "formato": nuevo_formato,
                         "estado": "Ideación",
-                        "subtitulos": nuevo_subtitulo,
+                        "subtitulos": f"[{objetivo_embudo}] {nuevo_subtitulo} | CTA: {cta_texto}",
                         "fecha_programada": str(nueva_fecha),
                         "responsable": responsable_asignado,
                         "vistos_por": ""
@@ -123,7 +127,7 @@ with tab_kanban:
                 with st.expander(f"📌 {video_titulo}", expanded=False):
                     st.caption(f"📱 {video_formato} | 📅 {video_fecha}")
                     if video_subt:
-                        st.markdown(f"*Subtítulo:* {video_subt}")
+                        st.markdown(f"*Detalle / Embudo:* {video_subt}")
                     
                     # Responsable y control de equipo
                     resp_idx = EQUIPO.index(responsable_actual) if responsable_actual in EQUIPO else 0
@@ -131,16 +135,16 @@ with tab_kanban:
                     
                     # Control de quiénes vieron / revisaron la tarea
                     vistos_lista = [m.strip() for m in vistos_actuales.split(",") if m.strip()]
-                    nuevos_vistos = st.multiselect("Visto / Revisado por:", EQUIPO, default=[m for m in vistos_lista if m in EQUIPO], key=f"vistos_{video_id}")
+                    nuevos_vistos = st.multiselect("Revisado por:", EQUIPO, default=[m for m in vistos_lista if m in EQUIPO], key=f"vistos_{video_id}")
                     
                     # Campos editables
                     nuevo_guion = st.text_input("Link Guion / Doc", value=video_guion, key=f"guion_{video_id}")
                     
-                    # Simulación IA para Hashtags
+                    # Simulación IA para Hashtags comerciales
                     if st.button("✨ Generar Hashtags IA", key=f"ai_{video_id}", use_container_width=True):
                         with st.spinner('Analizando...'):
                             time.sleep(1)
-                            hashtags_nuevos = "#CreatorCRM #InstagramGrowth #Viral"
+                            hashtags_nuevos = "#CreatorCRM #NegociosDigitales #EmbudosDeVenta"
                             supabase.table("videos").update({"hashtags": hashtags_nuevos}).eq("id", video_id).execute()
                             st.success("¡Actualizado!")
                             st.rerun()
@@ -185,8 +189,8 @@ with tab_kanban:
 # PESTAÑA 2: CURSOS Y CAPACITACIONES
 # ==========================================
 with tab_cursos:
-    st.header("📚 Academia Interna - Cursos del Equipo")
-    st.markdown("Control de creación, lectura y progreso de los cursos formativos entre Catalina y el equipo.")
+    st.header("📚 Academia Interna - Cursos & Productos Digitales")
+    st.markdown("Gestión del pipeline de creación de cursos, control de lectura del equipo y estatus de lanzamiento.")
     
     col_c1, col_c2 = st.columns([1, 2])
     
@@ -194,14 +198,14 @@ with tab_cursos:
         st.subheader("➕ Crear Nuevo Curso")
         with st.form("nuevo_curso_form", clear_on_submit=True):
             curso_titulo = st.text_input("Título del Curso / Módulo")
-            curso_estado = st.selectbox("Estado del Curso", ["Borrador", "En Edición", "Publicado y Disponible"])
+            curso_estado_init = st.selectbox("Estado del Curso", estados_curso)
             btn_curso = st.form_submit_button("Crear Curso", type="primary")
             
             if btn_curso and curso_titulo:
                 try:
                     supabase.table("cursos").insert({
                         "titulo": curso_titulo,
-                        "estado": curso_estado,
+                        "estado": curso_estado_init,
                         "progreso": 0,
                         "leido_por": ""
                     }).execute()
@@ -212,24 +216,28 @@ with tab_cursos:
                     st.error(f"Error: {e}")
                     
     with col_c2:
-        st.subheader("📋 Progreso de Cursos Activos")
+        st.subheader("📋 Pipeline y Progreso de Cursos")
         if not cursos_db:
-            st.info("A todavía no hay cursos creados. ¡Agregá el primero desde el panel izquierdo!")
+            st.info("Todavía no hay cursos creados. ¡Agregá el primero desde el panel izquierdo!")
         else:
             for curso in cursos_db:
                 c_id = curso.get("id")
                 c_titulo = curso.get("titulo")
-                c_estado = curso.get("estado")
+                c_estado = curso.get("estado", "Borrador")
                 c_progreso = curso.get("progreso", 0)
                 c_leido = curso.get("leido_por") or ""
                 
-                with st.expander(f"📖 {c_titulo} ({c_estado})", expanded=True):
+                with st.expander(f"📖 {c_titulo}", expanded=True):
+                    # Selector de estado del curso (Borrador, En Edición, Publicado)
+                    est_idx = estados_curso.index(c_estado) if c_estado in estados_curso else 0
+                    nuevo_estado_curso = st.selectbox("Estado de Lanzamiento:", estados_curso, index=est_idx, key=f"est_curso_{c_id}")
+                    
                     # Barra de progreso interactiva
                     nuevo_progreso = st.slider("Porcentaje de Avance General", 0, 100, c_progreso, key=f"prog_{c_id}")
                     
-                    # Control de quiénes ya lo leyeron
+                    # Control de lectura / completado por el equipo
                     leidos_lista = [m.strip() for m in c_leido.split(",") if m.strip()]
-                    equipo_leido = st.multiselect("Leído / Completado por:", EQUIPO, default=[m for m in leidos_lista if m in EQUIPO], key=f"leido_por_{c_id}")
+                    equipo_leido = st.multiselect("Leído / Estudiado por:", EQUIPO, default=[m for m in leidos_lista if m in EQUIPO], key=f"leido_por_{c_id}")
                     
                     # Botón eliminar curso
                     if st.button("🗑️ Borrar Curso", key=f"del_c_{c_id}"):
@@ -241,11 +249,12 @@ with tab_cursos:
                         except Exception as e:
                             st.error(f"Error: {e}")
                             
-                    # Actualizar cambios del curso
+                    # Actualizar cambios del curso en Supabase
                     leidos_str = ",".join(equipo_leido)
-                    if nuevo_progreso != c_progreso or leidos_str != c_leido:
+                    if nuevo_progreso != c_progreso or leidos_str != c_leido or nuevo_estado_curso != c_estado:
                         supabase.table("cursos").update({
                             "progreso": nuevo_progreso,
-                            "leido_por": leidos_str
+                            "leido_por": leidos_str,
+                            "estado": nuevo_estado_curso
                         }).eq("id", c_id).execute()
                         st.rerun()
